@@ -4,47 +4,68 @@ hosted at <https://www.github.com/nxrada/yt-dlp-gui/>
 '''
 import tkinter as tk
 from yt_dlp import YoutubeDL
-from yt_dlp import utils
-import re
+import logging
 
 DOWNLOAD_DIR = "../downloads/%(title)s.%(ext)s"
+handler = None
+    
+# Handles event hooks passed from YouTubeDL during download process. 
+def my_hook(d, console_log):
+    if d['status'] == 'finished':
+        filename = d['_filename']
+        console_log['state'] = 'normal'
+        console_log.insert(tk.END, f'\nFile downloaded to f{filename}.\n')
+        console_log['state'] = 'disabled'
 
 
-# Sanatizes error before print to GUI. 
-def sanitize_error(e):
-    error = str(e)
-    match = re.search(r"'(.*?)' is not a valid URL.", error)
-    if match:
-        sanitized_string = f"ERROR: {match.group(0)}"
-        return sanitized_string
-    else:
-        return e
-def set_ydl_options():
+# Sets options for YoutTubeDL.download() function. 
+def set_ydl_options(console_log):
+    global handler
+    logger = logging.getLogger()
+    if handler:
+        logger.removeHandler(handler)
+    logger = logging.getLogger()
+    handler = TextHandler(console_log)
+    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    
     ydl_options = {
         'outtmpl': DOWNLOAD_DIR,
+        'logger': logger,
+        'progress_hooks': [lambda d: my_hook(d, console_log)],
     }
     return ydl_options
 
 def download_video(url: str, console_log):
-    try:
-        # Re-enable the console log, insert text, then disable it
-        console_log['state'] = 'normal'
-        console_log.delete('1.0', tk.END)
-        console_log['state'] = 'disabled'
-        
+    console_log['state'] = 'normal'
+    console_log.delete('1.0', tk.END)
+    console_log['state'] = 'disabled'
+    try:        
         # Download video
-        YoutubeDL(set_ydl_options()).download([url])        
-        
-        # Re-enable the console log, insert text, then disable it
-        console_log['state'] = 'normal'
-        console_log.insert(tk.END, '\nFile downloaded to ../downloads/.')
-        console_log['state'] = 'disabled'
+        YoutubeDL(set_ydl_options(console_log)).download([url])        
 
-    except utils.DownloadError as e:
+    except Exception as e:
         # Print to console log window
         console_log['state'] = 'normal'
-        console_log.insert(tk.END, sanitize_error(e)+'\n')
+        console_log.insert(tk.END, str(e)+'\n')
         console_log['state'] = 'disabled'
+
+
+# Logging handler
+class TextHandler(logging.Handler):
+    def __init__(self, console_log):
+        logging.Handler.__init__(self)
+        self.console_log = console_log
+
+    def emit(self, record):
+        log_entry = self.format(record)
+        self.console_log['state'] = 'normal'
+        self.console_log.insert(tk.END, log_entry + '\n')
+        self.console_log['state'] = 'disabled'
+        self.console_log.see(tk.END)  # Scroll to end
+
 
 # Main function
 def main():
