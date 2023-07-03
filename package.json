@@ -12,5 +12,8 @@
   "license": "ISC",
   "dependencies": {
     "youtube-dl-exec": "^2.4.6"
+  },
+  "devDependencies": {
+    "electron-packager": "^17.1.1"
   }
 }
